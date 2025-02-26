@@ -100,3 +100,5 @@ mail = Mail(app)
 # بيانات الاتصال بقاعدة البيانات
 connection_string = "dbname=eden user=postgres password=ahmed2003 host=db port=5432"
 conn = psycopg2.connect(connection_string)
+
+#make host = localhost if you want to run it locally not from the container
