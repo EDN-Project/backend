@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:latest
+    container_name: eden-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ahmed2003
+      POSTGRES_DB: eden
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./eden.backup:/docker-entrypoint-initdb.d/eden.backup
+
+  app:
+    build: .
+    container_name: flask-app
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "5000:5000"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ahmed2003
+      POSTGRES_DB: eden
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    volumes:
+      - .:/app
+    entrypoint: ["/bin/bash", "/app/entrypoint.sh"]
+
+volumes:
+  db_data:
