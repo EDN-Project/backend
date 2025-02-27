@@ -2,13 +2,21 @@
 import app as a
 
 def hash_password(password):
+    """ دالة لتشفير كلمة المرور """
     salt = a.bcrypt.gensalt()
     hashed_password = a.bcrypt.hashpw(password.encode('utf-8'), salt)
-    return hashed_password.decode('utf-8')
-
+    return hashed_password.decode()  # تحويل الـ bytes إلى نص مشفر
 
 def verify_password(password, hashed):
-    return a.bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    """ دالة للتحقق من صحة كلمة المرور """
+    return a.bcrypt.checkpw(password.encode('utf-8'), hashed.encode())
+
+def delete_temp_data(email, delay=300):
+    """ دالة لحذف البيانات المؤقتة بعد مدة معينة """
+    def delayed_delete():
+        a.threading.Timer(delay, lambda: a.temp_data.pop(email, None)).start()
+
+    a.threading.Thread(target=delayed_delete, daemon=True).start()
 
 
 def generate_token(user_id):
@@ -31,35 +39,45 @@ def send_email(email, code):
         print(f"Error sending email: {e}")
 
 
-def delete_temp_data(email):
-    a.threading.Timer(300, lambda: a.temp_data.pop(email, None)).start()
-
-
 @a.app.route("/")
 def serve_json():
     return a.jsonify({"message": "EDEN!"})
+
 
 
 @a.app.route('/register', methods=['POST'])
 def register():
     data = a.request.json
     name, email, phone, password = data.get('name'), data.get('email'), data.get('phone'), data.get('password')
-    hashed_password = hash_password(password)
-    code = ''.join(a.random.choices('0123456789', k=6))
-    a.temp_data[email] = {'name': name, 'phone': phone, 'password': hashed_password, 'code': code}
-    send_email(email, code)
-    delete_temp_data(email)
-    return a.jsonify({"message": "Verification code sent!"}), 200
 
+    # ✅ تشفير كلمة المرور
+    hashed_password = hash_password(password)
+
+    # ✅ توليد كود التحقق (OTP)
+    code = ''.join(a.random.choices('0123456789', k=6))
+
+    # ✅ تخزين البيانات مؤقتًا
+    a.temp_data[email] = {'name': name, 'phone': phone, 'password': hashed_password, 'code': code}
+
+    # ✅ إرسال كود التحقق عبر البريد الإلكتروني
+    send_email(email, code)
+
+    # ✅ حذف البيانات بعد 5 دقائق
+    delete_temp_data(email)
+
+    return a.jsonify({"message": "Verification code sent!"}), 200
 
 @a.app.route('/confirm', methods=['POST'])
 def confirm():
     data = a.request.json
-    email, code = data.get('email'), data.get('code')
-    if email in a.temp_data and a.temp_data[email]['code'] == code:
+    code = data.get('code')
+
+    # البحث عن المستخدم بواسطة الكود فقط
+    email = next((key for key, value in a.temp_data.items() if value['code'] == code), None)
+
+    if email:
         user_data = a.temp_data[email]
         try:
-
             cursor = a.conn.cursor()
             cursor.execute("INSERT INTO actor.user (name, email, phone, password) VALUES (%s, %s, %s, %s)",
                            (user_data['name'], email, user_data['phone'], user_data['password']))
@@ -70,42 +88,44 @@ def confirm():
             return a.jsonify({"message": "Registration successful!"}), 201
         except Exception as e:
             return a.jsonify({"error": f"Registration failed: {e}"}), 400
-    return a.jsonify({"error": "Invalid code or expired!"}), 400
+
+    return a.jsonify({"error": "Invalid or expired code!"}), 400
 
 
 @a.app.route('/login', methods=['POST'])
 def login():
+    
+    print(1)
+    
     data = a.request.json
     email = data.get('email')
     password = data.get('password')
 
     try:
-
         cursor = a.conn.cursor()
         cursor.execute("SELECT user_id, password FROM actor.user WHERE email = %s", (email,))
         user = cursor.fetchone()
-
         cursor.close()
 
-        if user:
-            user_id, stored_password = user  # استرجاع ID وكلمة المرور المشفرة
-
-            # مقارنة كلمة المرور المدخلة بالمخزنة
-            if a.bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
-                # توليد التوكن
-                token = generate_token(user_id)
-
-                return a.jsonify({
-                    "message": "Login successful!",
-                    "token": token  # إرسال التوكن في الـ response
-                }), 200
-            else:
-                return a.jsonify({"error": "Invalid password!"}), 401
-        else:
+        if not user:
             return a.jsonify({"error": "User not found!"}), 404
 
+        user_id, stored_password = user  # استرجاع ID وكلمة المرور المشفرة
+        
+        # ✅ التأكد أن `stored_password` نص صالح وليس `bytes`
+        if isinstance(stored_password, bytes):
+            stored_password = stored_password.decode('utf-8')
+        
+        # ✅ التحقق من كلمة المرور
+        if a.bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+            token = generate_token(user_id)
+            
+            return a.jsonify({"message": "Login successful!", "token": token}), 200
+        else:
+            return a.jsonify({"error": "Invalid password!"}), 401
+
     except Exception as e:
-        print(f"Error logging in: {e}")
+        print(f"❌ Error verifying password: {e}")
         return a.jsonify({"error": "Internal server error!"}), 500
 
 
@@ -244,12 +264,10 @@ def user_data():
     try:
         decoded = a.jwt.decode(token, a.app.config['SECRET_KEY'], algorithms=['HS256'])
         a.user_id = decoded['user_id']
-        conn = a.psycopg2.connect(a.connection_string)
-        cursor = conn.cursor()
-        cursor.execute("SELECT name, email, phone , user_name FROM actor.user WHERE id = %s", (a.user_id,))
+        cursor = a.conn.cursor()
+        cursor.execute("SELECT name, email, phone , user_name FROM actor.user WHERE user_id = %s", (a.user_id,))
         user = cursor.fetchone()
         cursor.close()
-        conn.close()
         return a.jsonify({"name": user[0], "email": user[1], "phone": user[2] , "user_name" : user[3]}), 200
     except Exception as e:
         return a.jsonify({"error": f"Invalid token: {e}"}), 401
