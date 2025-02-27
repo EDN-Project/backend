@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   db:
-    image: ahmedwaleed95/eden-postgres:latest
+    image: postgres:17
     container_name: eden-postgres
     restart: always
     environment:
@@ -16,7 +14,7 @@ services:
       - ./eden.backup:/docker-entrypoint-initdb.d/eden.backup
 
   app:
-    image: ahmedwaleed95/flask-app:latest
+    build: .
     container_name: flask-app
     restart: always
     depends_on:
