@@ -50,22 +50,40 @@ def register():
     data = a.request.json
     name, email, phone, password = data.get('name'), data.get('email'), data.get('phone'), data.get('password')
 
-    # ✅ تشفير كلمة المرور
-    hashed_password = hash_password(password)
+    try:
+        cursor = a.conn.cursor()
 
-    # ✅ توليد كود التحقق (OTP)
-    code = ''.join(a.random.choices('0123456789', k=6))
+        # ✅ التحقق مما إذا كان البريد الإلكتروني مسجلاً بالفعل
+        cursor.execute("SELECT email FROM actor.user WHERE email = %s", (email,))
+        existing_user = cursor.fetchone()
 
-    # ✅ تخزين البيانات مؤقتًا
-    a.temp_data[email] = {'name': name, 'phone': phone, 'password': hashed_password, 'code': code}
+        if existing_user:
+            cursor.close()
+            return a.jsonify({"error": "Email is already registered!"}), 400
+        
+        else:
 
-    # ✅ إرسال كود التحقق عبر البريد الإلكتروني
-    send_email(email, code)
+        # ✅ تشفير كلمة المرور
+            hashed_password = hash_password(password)
 
-    # ✅ حذف البيانات بعد 5 دقائق
-    delete_temp_data(email)
+            # ✅ توليد كود التحقق (OTP)
+            code = ''.join(a.random.choices('0123456789', k=6))
 
-    return a.jsonify({"message": "Verification code sent!"}), 200
+            # ✅ تخزين البيانات مؤقتًا
+            a.temp_data[email] = {'name': name, 'phone': phone, 'password': hashed_password, 'code': code}
+
+            # ✅ إرسال كود التحقق عبر البريد الإلكتروني
+            send_email(email, code)
+
+            # ✅ حذف البيانات بعد 5 دقائق
+            delete_temp_data(email)
+
+            cursor.close()
+            return a.jsonify({"message": "Verification code sent!"}), 200
+
+    except Exception as e:
+        return a.jsonify({"error": f"Registration failed: {e}"}), 500
+    
 
 @a.app.route('/confirm', methods=['POST'])
 def confirm():
