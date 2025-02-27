@@ -6,5 +6,5 @@ authlib
 psycopg2-binary
 requests
 bcrypt
-jwt
+PyJWT==2.8.0
 pandas
