@@ -15,34 +15,67 @@ import threading
 import pandas as pd
 
 
-# -------------------------------- vars for global analysis ------------------------------------- 
-
-month = 0
-code = 0
-country = 0
-variety = 0
-countries = []
 
 recommendations = {
-    "Elsanta": "Increase potassium (K) to 3:1:4 and reduce irrigation at the end of fruiting to enhance Brix levels.",
-    "Camarosa": "Maintain NPK at 2:1:3 and increase light exposure to 16 hours per day to boost photosynthesis.",
-    "Albion": "Use NPK at 1:2:3 and increase calcium (Ca) to 250 ppm to prevent fibrosis and enhance sweetness.",
-    "Charlotte": "Maintain balanced fertilization at 1:2:3 and increase magnesium (Mg) to support sugar production.",
-    "Monterey": "Reduce nitrogen (N) after flowering to 1:1:3 and increase irrigation and light during early fruiting.",
-    "San Andreas": "Use 2:1:3 and increase iron (Fe) to 0.2 ppm to enhance color and flavor.",
-    "Seolhyang": "Naturally high in sugar, so focus on high-potassium fertilization (1:2:4) and gradually reduce irrigation.",
-    "Gariguette": "Keep NPK at 1:3:2 and increase zinc (Zn) to 0.1 ppm to enhance taste and sweetness.",
-    "Elan": "Requires high phosphorus (P) levels; use 1:3:3 to improve color and taste.",
-    "Jewel": "Use 1:2:4 and increase boron (B) to 0.1 ppm to improve fruit quality.",
-    "Tochiotome": "Increase magnesium (Mg) to 80 ppm and reduce nitrogen after flowering to enhance sugar levels.",
-    "Festival": "Use 1:2:3 and decrease irrigation during the last two weeks of fruiting to concentrate sugar."
+    "Elsanta": {
+        "UK": "Increase potassium (K) to 3:1:4 for higher sweetness and reduce irrigation at the end of fruiting.",
+        "Germany": "Maintain K at 2:1:3 for balanced taste and increase magnesium (Mg) to 50 ppm for better fruit quality.",
+        "Netherlands": "Use 3:1:3 and increase light exposure to enhance color and firmness."
+    },
+    "Camarosa": {
+        "Saudi Arabia": "Maintain NPK at 2:1:3, increase light to 16 hours per day, and boost potassium for a sweeter taste.",
+        "Poland": "Adjust to 2:2:3, reduce potassium slightly to maintain mild acidity, and enhance phosphorus for flavor.",
+        "USA": "Use 2:1:3, maintain balanced irrigation, and increase calcium to prevent soft fruit."
+    },
+    "Albion": {
+        "France": "Use NPK at 1:2:3, increase calcium (Ca) to 250 ppm to enhance sweetness and firmness.",
+        "Canada": "Maintain 1:2:4, boost boron (B) to 0.1 ppm for better fruit texture.",
+        "Japan": "Use 1:3:3 to emphasize natural sweetness and enhance phosphorus levels."
+    },
+    "Monterey": {
+        "UAE": "Reduce nitrogen (N) after flowering to 1:1:3 and increase potassium to improve sugar content.",
+        "USA": "Increase irrigation and light during early fruiting for optimal development.",
+        "Mexico": "Use 1:1:3, slightly increase magnesium for stronger fruit structure."
+    },
+    "San Andreas": {
+        "Spain": "Use 2:1:3 and increase iron (Fe) to 0.2 ppm to enhance deep red color and sweetness.",
+        "Italy": "Use 1:2:3 and increase calcium for firmer fruit.",
+        "Brazil": "Adjust to 2:1:4, focusing on higher potassium for a more tropical sweetness."
+    },
+    "Seolhyang": {
+        "South Korea": "Naturally sweet; focus on high-potassium fertilization (1:2:4) and gradually reduce irrigation.",
+        "China": "Use 1:2:3, increase magnesium to 80 ppm to enhance sugar levels.",
+        "Vietnam": "Maintain 1:2:4, increase boron to 0.1 ppm for better fruit uniformity."
+    },
+    "Gariguette": {
+        "France": "Keep NPK at 1:3:2 and increase zinc (Zn) to 0.1 ppm for enhanced traditional taste.",
+        "Belgium": "Use 1:2:3, increase phosphorus for richer aroma.",
+        "Switzerland": "Use 1:3:3, adjust potassium for a refined sweetness."
+    },
+    "Elan": {
+        "Netherlands": "Requires high phosphorus (P) levels; use 1:3:3 to improve color and taste.",
+        "Sweden": "Use 1:3:2, increase magnesium to enhance aroma.",
+        "Denmark": "Maintain 1:2:3, increase boron for better flowering."
+    },
+    "Jewel": {
+        "USA": "Use 1:2:4 and increase boron (B) to 0.1 ppm for improved fruit quality.",
+        "Canada": "Use 1:3:3 and increase calcium to enhance firmness.",
+        "UK": "Maintain 1:2:3 and boost potassium for a balanced taste."
+    },
+    "Tochiotome": {
+        "Japan": "Increase magnesium (Mg) to 80 ppm and reduce nitrogen after flowering to enhance sugar levels.",
+        "South Korea": "Use 1:2:3 and maintain stable irrigation for a softer texture.",
+        "China": "Increase potassium slightly to enhance sweetness."
+    },
+    "Festival": {
+        "Egypt": "Use 1:2:3 and decrease irrigation during the last two weeks to concentrate sugar levels.",
+        "Spain": "Maintain 1:2:3, increase calcium for improved firmness.",
+        "USA": "Use 1:2:4, enhance potassium to intensify flavor."
+    }
 }
 
 
-# ----------------------------------vars for sign up and authentification---------------------------------
 
-
-user_id = 0
 
 
 # -----------------------------------------all things about the app-------------------------------------------------
@@ -98,7 +131,5 @@ mail = Mail(app)
 
 
 # بيانات الاتصال بقاعدة البيانات
-connection_string = "dbname=eden user=postgres password=ahmed2003 host=db port=5432"
+connection_string = "dbname=eden user=postgres password=ahmed2003 host= db port=5432"
 conn = psycopg2.connect(connection_string)
-
-#make host = localhost if you want to run it locally not from the container
