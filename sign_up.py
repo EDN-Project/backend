@@ -1,43 +1,6 @@
 
 import app as a
 
-def hash_password(password):
-    """ دالة لتشفير كلمة المرور """
-    salt = a.bcrypt.gensalt()
-    hashed_password = a.bcrypt.hashpw(password.encode('utf-8'), salt)
-    return hashed_password.decode()  # تحويل الـ bytes إلى نص مشفر
-
-def verify_password(password, hashed):
-    """ دالة للتحقق من صحة كلمة المرور """
-    return a.bcrypt.checkpw(password.encode('utf-8'), hashed.encode())
-
-def delete_temp_data(email, delay=300):
-    """ دالة لحذف البيانات المؤقتة بعد مدة معينة """
-    def delayed_delete():
-        a.threading.Timer(delay, lambda: a.temp_data.pop(email, None)).start()
-
-    a.threading.Thread(target=delayed_delete, daemon=True).start()
-
-
-def generate_token(user_id):
-    payload = {'user_id': user_id, 'exp': a.datetime.utcnow() + a.timedelta(days=1)}
-    return a.jwt.encode(payload, a.app.config['SECRET_KEY'], algorithm='HS256')
-
-
-def send_email(email, code):
-    try:
-        msg = a.MIMEText(f"Your verification code is: {code}")
-        msg['Subject'] = "Verification Code"
-        msg['From'] = a.EMAIL_ADDRESS
-        msg['To'] = email
-
-        with a.smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(a.EMAIL_ADDRESS, a.EMAIL_PASSWORD)
-            server.sendmail(a.EMAIL_ADDRESS, [email], msg.as_string())
-    except Exception as e:
-        print(f"Error sending email: {e}")
-
 
 @a.app.route("/")
 def serve_json():
@@ -64,7 +27,7 @@ def register():
         else:
 
         # ✅ تشفير كلمة المرور
-            hashed_password = hash_password(password)
+            hashed_password = a.hash_password(password)
 
             # ✅ توليد كود التحقق (OTP)
             code = ''.join(a.random.choices('0123456789', k=6))
@@ -73,10 +36,10 @@ def register():
             a.temp_data[email] = {'name': name, 'phone': phone, 'password': hashed_password, 'code': code , 'company_name' : company_name}
 
             # ✅ إرسال كود التحقق عبر البريد الإلكتروني
-            send_email(email, code)
+            a.send_email(email, code)
 
             # ✅ حذف البيانات بعد 5 دقائق
-            delete_temp_data(email)
+            a.delete_temp_data(email)
 
             cursor.close()
             return a.jsonify({"message": "Verification code sent!"}), 200
@@ -139,7 +102,7 @@ def login():
         
         # ✅ التحقق من كلمة المرور
         if a.bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
-            token = generate_token(user_id)
+            token = a.generate_token(user_id)
             
             return a.jsonify({"message": "Login successful!", "token": token}), 200
         else:
@@ -169,7 +132,7 @@ def forgot_password():
         a.temp_data[user_email] = reset_code  # تخزين الكود مؤقتًا
 
         # تشغيل الـ Timer لحذف الكود بعد 5 دقائق
-        delete_temp_data(user_email)
+        a.delete_temp_data(user_email)
 
         msg = a.Message(
             subject="Your Password Reset Code",
