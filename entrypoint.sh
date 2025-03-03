@@ -33,7 +33,7 @@ else
   # Count the number of schemas (excluding system schemas)
   SCHEMA_COUNT=$(psql -h db -U postgres -d eden -tAc "SELECT COUNT(schema_name) FROM information_schema.schemata WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'public');")
 
-  if [[ "$SCHEMA_COUNT" -eq "1" ]]; then
+  if [[ "$SCHEMA_COUNT" -eq "0" ]]; then
     echo "📌 Only one schema found, restoring backup..."
     pg_restore --verbose --clean --if-exists --no-owner --exit-on-error -h db -U postgres -d eden /app/eden.backup
     
