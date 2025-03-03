@@ -48,7 +48,7 @@ def serve_json():
 @a.app.route('/register', methods=['POST'])
 def register():
     data = a.request.json
-    name, email, phone, password = data.get('name'), data.get('email'), data.get('phone'), data.get('password')
+    name, email, phone, password , company_name = data.get('name'), data.get('email'), data.get('phone'), data.get('password') , data.get('company_name')
 
     try:
         cursor = a.conn.cursor()
@@ -70,7 +70,7 @@ def register():
             code = ''.join(a.random.choices('0123456789', k=6))
 
             # ✅ تخزين البيانات مؤقتًا
-            a.temp_data[email] = {'name': name, 'phone': phone, 'password': hashed_password, 'code': code}
+            a.temp_data[email] = {'name': name, 'phone': phone, 'password': hashed_password, 'code': code , 'company_name' : company_name}
 
             # ✅ إرسال كود التحقق عبر البريد الإلكتروني
             send_email(email, code)
@@ -86,7 +86,9 @@ def register():
     
 
 @a.app.route('/confirm', methods=['POST'])
+
 def confirm():
+    
     data = a.request.json
     code = data.get('code')
 
