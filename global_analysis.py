@@ -17,20 +17,17 @@ def top_importers():
     global code
     
     try:
-        
         data = a.request.json
         plant_time = data.get("plant_time")
         code = data.get('code')
-        
+
         if plant_time:
             month = a.datetime.fromisoformat(plant_time).month + 4  # حساب الشهر
-        
-        
+
         cur = a.conn.cursor()
 
-        # ✅ تعديل الاستعلام وإضافة اسم الجدول
         query = f"""
-                        WITH LatestYear AS (
+            WITH LatestYear AS (
                 SELECT MAX(year) AS max_year FROM global.world_demand
             ),
             RankedData AS (
@@ -42,9 +39,9 @@ def top_importers():
                     RANK() OVER (PARTITION BY wd.year ORDER BY wd.quantity DESC) AS rank
                 FROM global.world_demand wd
                 CROSS JOIN LatestYear
-                WHERE wd.month = {month}
+                WHERE wd.month = %s
                 AND wd.year > (LatestYear.max_year - 5)
-                AND wd.code = '{code}'
+                AND wd.code = %s
             )
             SELECT importers, year, month, quantity
             FROM RankedData
@@ -52,16 +49,28 @@ def top_importers():
             ORDER BY year DESC, quantity DESC;
         """
 
-        # ✅ تنفيذ الاستعلام وجلب البيانات
-        cur.execute(query)
-        data = cur.fetchall()  # جلب كل البيانات
+        cur.execute(query, (month, code))
+        data = cur.fetchall()  
+        cur.close()  # ✅ إغلاق الـ cursor بعد الاستخدام
 
-        # ✅ تحويل البيانات إلى DataFrame
-        df = a.pd.DataFrame(data, columns=["Importers", "year", "month", "quantity"])
-        
-        countries = df['Importers'].unique().tolist()
-        
-        return a.jsonify({"top_importers": df.to_dict(orient="records") , "countries": countries})
+        # ✅ استخراج قائمة الدول
+        countries = list(set(row[0] for row in data))
+
+        # ✅ تحويل البيانات إلى الشكل المطلوب
+        from collections import defaultdict
+        result = defaultdict(dict)
+
+        for importer, year, month, quantity in data:
+            result[year]["year"] = year
+            result[year][importer] = quantity
+
+        response_data = list(result.values())
+
+        return a.jsonify({"top_importers": response_data, "countries": countries})
+
+    except Exception as e:
+        print("❌ Error in /top_importers:", str(e))  
+        return a.jsonify({"error": str(e)}), 500
 
         
 
@@ -84,7 +93,7 @@ def receive_code_country():
     if not country:
         return a.jsonify({'error': 'Missing code or country'}), 400
     
-    return a.jsonify({'message': 'Data received', 'country': country})
+    return a.jsonify({'message': 'Data received', 'country': country , 'code' : code})
 
 
 
