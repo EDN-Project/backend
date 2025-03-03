@@ -127,6 +127,44 @@ app.config['MAIL_PASSWORD'] = "cwal ftyz xkzt ftgn"
 mail = Mail(app)
 
 
+def hash_password(password):
+    """ دالة لتشفير كلمة المرور """
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed_password.decode()  # تحويل الـ bytes إلى نص مشفر
+
+def verify_password(password, hashed):
+    """ دالة للتحقق من صحة كلمة المرور """
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode())
+
+def delete_temp_data(email, delay=300):
+    """ دالة لحذف البيانات المؤقتة بعد مدة معينة """
+    def delayed_delete():
+        threading.Timer(delay, lambda: temp_data.pop(email, None)).start()
+
+    threading.Thread(target=delayed_delete, daemon=True).start()
+
+
+def generate_token(user_id):
+    payload = {'user_id': user_id, 'exp': datetime.utcnow() + timedelta(days=1)}
+    return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+
+
+def send_email(email, code):
+    try:
+        msg = MIMEText(f"Your verification code is: {code}")
+        msg['Subject'] = "Verification Code"
+        msg['From'] = EMAIL_ADDRESS
+        msg['To'] = email
+
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            server.sendmail(EMAIL_ADDRESS, [email], msg.as_string())
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
+
 # -----------------------------------------------connection to the database------------------------------------------------------------
 
 
