@@ -1,6 +1,7 @@
 import app as a
 import access
 import sign_up
+import payment
 
 
 @a.app.route("/top_importers", methods=["POST"])
