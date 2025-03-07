@@ -1,11 +1,9 @@
-
 import app as a
 
 
 @a.app.route("/")
 def serve_json():
     return a.jsonify({"message": "EDEN!"})
-
 
 
 @a.app.route('/register', methods=['POST'])
@@ -227,6 +225,9 @@ def check_token():
         decoded = a.jwt.decode(token, a.app.config['SECRET_KEY'], algorithms=['HS256'])
         user_id = decoded['user_id']  # يمكن استخدام user_id لاحقًا إذا لزم الأمر
 
+        if not user_id:
+            return a.jsonify({"error": "Invalid Token!"}), 401
+        
         # إذا كان التوكن صالحًا، نعيد رسالة نجاح
         return a.jsonify({"message": "Token is valid!"}), 200
 
