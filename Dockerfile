@@ -1,4 +1,4 @@
-FROM python:latest
+FROM python:3.9.21-alpine3.21
 
 # تثبيت الأدوات المطلوبة وإضافة مستودع PostgreSQL الرسمي
 RUN apt-get update && apt-get install -y curl gnupg lsb-release
