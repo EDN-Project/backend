@@ -14,37 +14,30 @@ echo "✅ PostgreSQL is ready!"
 # Check if the database exists
 DB_EXIST=$(psql -h db -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='eden'")
 
-if [[ "$DB_EXIST" != "1" ]]; then
-  echo "📌 Database 'eden' does not exist, creating it..."
-  psql -h db -U postgres -c "CREATE DATABASE eden;"
-  echo "✅ Database 'eden' created successfully!"
+if [[ "$DB_EXIST" == "1" ]]; then
+  echo "⚠️ Database 'eden' already exists. Dropping it..."
   
-  echo "📌 Restoring backup..."
-  pg_restore --verbose --clean --if-exists --no-owner --exit-on-error -h db -U postgres -d eden /app/eden.backup
+  # Terminate active connections
+  psql -h db -U postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='eden';"
   
-  if [ $? -eq 0 ]; then
-    echo "✅ Backup restored successfully!"
-  else
-    echo "⚠️ Backup restoration failed!"
-  fi
+  # Drop the database
+  psql -h db -U postgres -c "DROP DATABASE eden;"
+  echo "✅ Database 'eden' dropped successfully!"
+fi
+
+# Create the database again
+echo "📌 Creating database 'eden'..."
+psql -h db -U postgres -c "CREATE DATABASE eden;"
+echo "✅ Database 'eden' created successfully!"
+
+# Restore the backup
+echo "📌 Restoring backup..."
+pg_restore --verbose --clean --if-exists --no-owner --exit-on-error -h db -U postgres -d eden /app/eden.backup
+
+if [ $? -eq 0 ]; then
+  echo "✅ Backup restored successfully!"
 else
-  echo "✅ Database already exists, checking schemas..."
-
-  # Count the number of schemas (excluding system schemas)
-  SCHEMA_COUNT=$(psql -h db -U postgres -d eden -tAc "SELECT COUNT(schema_name) FROM information_schema.schemata WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'public');")
-
-  if [[ "$SCHEMA_COUNT" -eq "0" ]]; then
-    echo "📌 Only one schema found, restoring backup..."
-    pg_restore --verbose --clean --if-exists --no-owner --exit-on-error -h db -U postgres -d eden /app/eden.backup
-    
-    if [ $? -eq 0 ]; then
-      echo "✅ Backup restored successfully!"
-    else
-      echo "⚠️ Backup restoration failed!"
-    fi
-  else
-    echo "⚠️ Multiple schemas found, skipping backup restoration."
-  fi
+  echo "⚠️ Backup restoration failed!"
 fi
 
 # Start the application
