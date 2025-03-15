@@ -207,12 +207,6 @@ def google_callback():
         "profile_picture": user_info.get("picture")
     })
 
-@a.app.route("/logout")
-def logout():
-    a.session.pop("user", None)
-    return a.jsonify({"message": "Logged out successfully!"})
-
-
 
 @a.app.route('/check_token', methods=['GET'])
 def check_token():
