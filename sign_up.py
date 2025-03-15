@@ -6,32 +6,44 @@ def serve_json():
     return a.jsonify({"message": "EDEN!"})
 
 
+
 @a.app.route('/register', methods=['POST'])
 def register():
     data = a.request.json
-    name, email, phone, password , company_name = data.get('name'), data.get('email'), data.get('phone'), data.get('password') , data.get('company_name')
+    name, email, phone, password, company_name = (
+        data.get('name'),
+        data.get('email'),
+        data.get('phone'),
+        data.get('password'),
+        data.get('company_name'),
+    )
 
     try:
         cursor = a.conn.cursor()
 
         # ✅ التحقق مما إذا كان البريد الإلكتروني مسجلاً بالفعل
         cursor.execute("SELECT email FROM actor.user WHERE email = %s", (email,))
-        existing_user = cursor.fetchone()
-
-        if existing_user:
+        if cursor.fetchone():
             cursor.close()
-            return a.jsonify({"error": "Email is already registered!"}), 400
+            return a.jsonify({"error": "Email is already registered!"}), 400  # 🔹 إرجاع الخطأ مباشرة
+        
         
         else:
-
-        # ✅ تشفير كلمة المرور
+        
+            # ✅ تشفير كلمة المرور
             hashed_password = a.hash_password(password)
 
             # ✅ توليد كود التحقق (OTP)
             code = ''.join(a.random.choices('0123456789', k=6))
 
             # ✅ تخزين البيانات مؤقتًا
-            a.temp_data[email] = {'name': name, 'phone': phone, 'password': hashed_password, 'code': code , 'company_name' : company_name}
+            a.temp_data[email] = {
+                'name': name,
+                'phone': phone,
+                'password': hashed_password,
+                'code': code,
+                'company_name': company_name,
+            }
 
             # ✅ إرسال كود التحقق عبر البريد الإلكتروني
             a.send_email(email, code)
