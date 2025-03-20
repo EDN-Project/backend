@@ -30,7 +30,9 @@ def password_farm():
             
             cur.execute(query, (hashed_company_id , user_id))
             a.conn.commit()
-            cur.close()  
+            cur.close() 
+            
+            return a.jsonify({"message": "Company ID added succesfully!"}), 401 
     
     except Exception as e:
         return a.jsonify({"error": str(e)}), 500    
