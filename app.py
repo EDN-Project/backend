@@ -13,6 +13,7 @@ from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import threading
 import pandas as pd
+import os
 
 
 
@@ -32,12 +33,18 @@ app.config['SESSION_USE_SIGNER'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
 
+app.secret_key =os.urandom(24)
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 Session(app)
 
 # Google OAuth Configuration
 GOOGLE_CLIENT_ID = "275610438837-170leviano6ajrmtlocod0q7an5ce07u.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET = "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"
 REDIRECT_URI = "http://127.0.0.1:5000/auth/google/callback"
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USER_INFO = "https://www.googleapis.com/oauth2/v1/userinfo"
 
 oauth = OAuth(app)
 oauth.register(
