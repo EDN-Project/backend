@@ -105,9 +105,9 @@ def global_access():
                 data = cur.fetchone()
             
             if data and data[0] == 1:
-                return a.jsonify({"message": "You have global access!", "access": True}), 200
+                return a.jsonify({"message": "You have access!", "access": True}), 200
             else:
-                return a.jsonify({"message": "You don't have global access!", "access": False}), 200
+                return a.jsonify({"message": "You don't have access!", "access": False}), 200
 
     except Exception as e:
         return a.jsonify({"error": str(e)}), 500
@@ -134,9 +134,9 @@ def data_sensor_access():
                 data = cur.fetchone()
             
             if data and data[0] == 1:
-                return a.jsonify({"message": "You have data sensor access!", "access": True , "user_id":user_id}), 200
+                return a.jsonify({"message": "You have access!", "access": True }), 200
             else:
-                return a.jsonify({"message": "You don't have  data sensor access!", "access": False , "user_id":user_id}), 200
+                return a.jsonify({"message": "You don't have access!", "access": False }), 200
 
     except Exception as e:
         return a.jsonify({"error": str(e)}), 500
@@ -160,9 +160,9 @@ def daily_report():
                 data = cur.fetchone()
             
             if data and data[0] == 1:
-                return a.jsonify({"message": "You have daily report access!", "access": True}), 200
+                return a.jsonify({"message": "You have access!", "access": True}), 200
             else:
-                return a.jsonify({"message": "You don't have  daily report access!", "access": False}), 200
+                return a.jsonify({"message": "You don't have access!", "access": False}), 200
 
     except Exception as e:
         return a.jsonify({"error": str(e)}), 500
@@ -186,9 +186,9 @@ def ai_report():
                 data = cur.fetchone()
             
             if data and data[0] == 1:
-                return a.jsonify({"message": "You have ai report access!", "access": True}), 200
+                return a.jsonify({"message": "You have access!", "access": True}), 200
             else:
-                return a.jsonify({"message": "You don't have  ai report access!", "access": False}), 200
+                return a.jsonify({"message": "You don't have access!", "access": False}), 200
 
     except Exception as e:
         return a.jsonify({"error": str(e)}), 500  
