@@ -1,4 +1,46 @@
+
 import app as a
+
+def hash_password(password):
+    """ دالة لتشفير كلمة المرور """
+    salt = a.bcrypt.gensalt()
+    hashed_password = a.bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed_password.decode()  # تحويل الـ bytes إلى نص مشفر
+
+def verify_password(password, hashed):
+    """ دالة للتحقق من صحة كلمة المرور """
+    return a.bcrypt.checkpw(password.encode('utf-8'), hashed.encode())
+
+def delete_temp_data(email, delay=300):
+    """ دالة لحذف البيانات المؤقتة بعد مدة معينة """
+    def delayed_delete():
+        a.threading.Timer(delay, lambda: a.temp_data.pop(email, None)).start()
+
+    a.threading.Thread(target=delayed_delete, daemon=True).start()
+
+
+def generate_token(user_id):
+    payload = {'user_id': user_id, 'exp': a.datetime.utcnow() + a.timedelta(days=1)}
+    return a.jwt.encode(payload, a.app.config['SECRET_KEY'], algorithm='HS256')
+
+
+def generate_state():
+    return ''.join(a.random.choices(a.string.ascii_letters + a.string.digits, k=16))
+
+
+def send_email(email, code):
+    try:
+        msg = a.MIMEText(f"Your verification code is: {code}")
+        msg['Subject'] = "Verification Code"
+        msg['From'] = a.EMAIL_ADDRESS
+        msg['To'] = email
+
+        with a.smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(a.EMAIL_ADDRESS, a.EMAIL_PASSWORD)
+            server.sendmail(a.EMAIL_ADDRESS, [email], msg.as_string())
+    except Exception as e:
+        print(f"Error sending email: {e}")
 
 
 @a.app.route("/")
@@ -59,9 +101,7 @@ def register():
     
 
 @a.app.route('/confirm', methods=['POST'])
-
 def confirm():
-    
     data = a.request.json
     code = data.get('code')
 
@@ -78,11 +118,8 @@ def confirm():
             cursor.close()
 
             a.temp_data.pop(email)
-            
             return a.jsonify({"message": "Registration successful!"}), 201
-        
         except Exception as e:
-            
             return a.jsonify({"error": f"Registration failed: {e}"}), 400
 
     return a.jsonify({"error": "Invalid or expired code!"}), 400
@@ -112,7 +149,7 @@ def login():
         
         # ✅ التحقق من كلمة المرور
         if a.bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
-            token = a.generate_token(user_id)
+            token = generate_token(user_id)
             
             return a.jsonify({"message": "Login successful!", "token": token}), 200
         else:
@@ -142,7 +179,7 @@ def forgot_password():
         a.temp_data[user_email] = reset_code  # تخزين الكود مؤقتًا
 
         # تشغيل الـ Timer لحذف الكود بعد 5 دقائق
-        a.delete_temp_data(user_email)
+        delete_temp_data(user_email)
 
         msg = a.Message(
             subject="Your Password Reset Code",
@@ -188,36 +225,35 @@ def reset_password():
     finally:
         cur.close()
 
+a.app.secret_key = a.os.urandom(24)
+SCOPES = ["openid", "email", "profile"]
+
+
 @a.app.route("/auth/google")
 def auth_google():
-    state = a.secrets.token_urlsafe(16)  # إنشاء قيمة state عشوائية وقوية
-    a.session['oauth_state'] = state  # حفظ state في الجلسة
-    a.session.permanent = True  # جعل الجلسة دائمة
-    print(f"Stored state: {state}")  # للتصحيح
+    state = generate_state()  
+    a.session["oauth_state"] = state  
 
-    return a.oauth.google.authorize_redirect(redirect_uri=a.REDIRECT_URI, state=state)
+    google = a.OAuth2Session(a.GOOGLE_CLIENT_ID, redirect_uri=a.REDIRECT_URI, scope=SCOPES, state=state)
+    authorization_url, _ = google.authorization_url(a.GOOGLE_AUTH_URL)
 
+    return a.redirect(authorization_url)
 
 @a.app.route("/auth/google/callback")
 def google_callback():
-    received_state = a.request.args.get('state')
-    stored_state = a.session.get('oauth_state')
+    state_received = a.request.args.get("state")
+    state_stored = a.session.pop("oauth_state", None)  
 
-    print(f"Received state: {received_state}, Stored state: {stored_state}")  # للتصحيح
+    if state_received != state_stored:
+        a.abort(400, "CSRF Warning! State mismatch.")  
 
-    if received_state != stored_state:
-        return a.jsonify({"error": "CSRF Warning! State mismatch."}), 400
+    google = a.OAuth2Session(a.GOOGLE_CLIENT_ID, redirect_uri=a.REDIRECT_URI)
+    token = google.fetch_token(a.GOOGLE_TOKEN_URL, client_secret=a.GOOGLE_CLIENT_SECRET,
+                               authorization_response=a.request.url)
 
-    token = a.oauth.google.authorize_access_token()
-    user_info = a.oauth.google.parse_id_token(token)
-    a.session.pop('oauth_state', None)  # حذف state بعد الاستخدام
+    user_info = google.get(a.GOOGLE_USER_INFO).json()
+    return a.jsonify(user_info)  
 
-    return a.jsonify({
-        "message": "Login successful!",
-        "name": user_info.get("name"),
-        "email": user_info.get("email"),
-        "profile_picture": user_info.get("picture")
-    })
 
 
 @a.app.route('/check_token', methods=['GET'])
@@ -229,11 +265,8 @@ def check_token():
     try:
         # فك تشفير التوكن والتحقق من صحته
         decoded = a.jwt.decode(token, a.app.config['SECRET_KEY'], algorithms=['HS256'])
-        user_id = decoded['user_id']  # يمكن استخدام user_id لاحقًا إذا لزم الأمر
+        a.user_id = decoded['user_id']  # يمكن استخدام user_id لاحقًا إذا لزم الأمر
 
-        if not user_id:
-            return a.jsonify({"error": "Invalid Token!"}), 401
-        
         # إذا كان التوكن صالحًا، نعيد رسالة نجاح
         return a.jsonify({"message": "Token is valid!"}), 200
 
@@ -256,9 +289,53 @@ def user_data():
         decoded = a.jwt.decode(token, a.app.config['SECRET_KEY'], algorithms=['HS256'])
         user_id = decoded['user_id']
         cursor = a.conn.cursor()
-        cursor.execute("SELECT name, email, phone , user_name , company_name FROM actor.user WHERE user_id = %s", (user_id,))
-        user = cursor.fetchone()
-        cursor.close()
-        return a.jsonify({"name": user[0], "email": user[1], "phone": user[2] , "user_name" : user[3] , "company_name" : user[4]}), 200
+
+        
+        query= 'select user_type from actor.user where user_id = %s'
+        cursor.execute(query, (user_id,))
+        user_type = cursor.fetchone()
+        
+        if user_type[0] == 'Owner':
+            
+                cursor.execute("""
+                SELECT name, email, phone, user_name, company_name 
+                FROM actor.user WHERE user_id = %s
+                    """, (user_id,))
+                user_data = cursor.fetchone()  # استرجاع صف واحد فقط
+
+                # ✅ الاستعلام الثاني: جلب بيانات الباقة
+                cursor.execute("""
+                    SELECT p1, p2, p3, year, month, price 
+                    FROM actor.package WHERE user_id = %s
+                """, (user_id,))
+                package_data = cursor.fetchall()  # استرجاع جميع الصفوف المتعلقة بالمستخدم
+
+                cursor.close()
+
+                # ✅ تجهيز البيانات للإرجاع
+                user = { 
+                    "name": user_data[0],
+                    "email": user_data[1],
+                    "phone": user_data[2],
+                    "user_name": user_data[3],
+                    "company_name": user_data[4],
+                } if user_data else None
+
+                packdge = [
+                    {
+                        "p1": row[0], "p2": row[1], "p3": row[2],
+                        "year": row[3], "month": row[4], "price": row[5]
+                    } for row in package_data
+                ]
+
+                return a.jsonify({"user": user, "packdge": packdge}), 200
+
+        else:
+          
+            cursor.execute("SELECT name, email, phone , user_name , company_name FROM actor.user WHERE user_id = %s", (user_id,))
+            user = cursor.fetchone()
+            cursor.close()
+            return a.jsonify({"name": user[0], "email": user[1], "phone": user[2] , "user_name" : user[3] , "company_name" : user[4]}), 200
+        
     except Exception as e:
         return a.jsonify({"error": f"Invalid token: {e}"}), 401
