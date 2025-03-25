@@ -14,30 +14,26 @@ echo "✅ PostgreSQL is ready!"
 # Check if the database exists
 DB_EXIST=$(psql -h db -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='eden'")
 
-if [[ "$DB_EXIST" == "1" ]]; then
-  echo "⚠️ Database 'eden' already exists. Dropping it..."
-  
-  # Terminate active connections
-  psql -h db -U postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='eden';"
-  
-  # Drop the database
-  psql -h db -U postgres -c "DROP DATABASE eden;"
-  echo "✅ Database 'eden' dropped successfully!"
+if [[ "$DB_EXIST" != "1" ]]; then
+  echo "📌 Database 'eden' not found. Creating it..."
+  psql -h db -U postgres -c "CREATE DATABASE eden;"
+  echo "✅ Database 'eden' created successfully!"
 fi
 
-# Create the database again
-echo "📌 Creating database 'eden'..."
-psql -h db -U postgres -c "CREATE DATABASE eden;"
-echo "✅ Database 'eden' created successfully!"
+# Check if schema 'sensor_readings' exists
+SCHEMA_EXIST=$(psql -h db -U postgres -d eden -tAc "SELECT 1 FROM information_schema.schemata WHERE schema_name='sensor_readings';")
 
-# Restore the backup
-echo "📌 Restoring backup..."
-pg_restore --verbose --clean --if-exists --no-owner --exit-on-error -h db -U postgres -d eden /app/eden.backup
-
-if [ $? -eq 0 ]; then
-  echo "✅ Backup restored successfully!"
+if [[ "$SCHEMA_EXIST" == "1" ]]; then
+  echo "⚠️ Schema 'sensor_readings' found. Skipping restore to preserve data."
 else
-  echo "⚠️ Backup restoration failed!"
+  echo "📌 Schema 'sensor_readings' not found. Proceeding with backup restore..."
+  pg_restore --verbose --clean --if-exists --no-owner --exit-on-error -h db -U postgres -d eden /app/eden.backup
+
+  if [ $? -eq 0 ]; then
+    echo "✅ Backup restored successfully!"
+  else
+    echo "⚠️ Backup restoration failed!"
+  fi
 fi
 
 # Start the application
