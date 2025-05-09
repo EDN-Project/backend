@@ -1,0 +1,10 @@
+Flask
+flask-session
+flask-cors
+flask-mail
+authlib
+psycopg2-binary
+requests
+bcrypt
+PyJWT==2.8.0
+pandas
