@@ -421,9 +421,13 @@ def zo2_3am():
 
 
 
-@a.app.route("/tasmeed", methods=["GET"])
+@a.app.route("/tasmeed", methods=["POST"])
 def tasmeed():
     try:
+        
+        data = a.request.json  # 📥 استقبال البيانات كـ JSON
+        stage = data.get("stage")
+        
         cur = a.conn.cursor()
 
         # ✅ جلب أسماء الأعمدة
@@ -439,10 +443,11 @@ def tasmeed():
         # ✅ تكوين استعلام ديناميكي لاختيار البيانات من الأعمدة المحددة
         query_data = f"""
             SELECT {', '.join([f'"{col}"' for col in columns])}
-            FROM tasmeed.tasmeed
+            FROM tasmeed.tasmeed 
+            WHERE stage = %s
         """
         
-        cur.execute(query_data)
+        cur.execute(query_data , (stage,))
         data = cur.fetchall()  # ✅ استرجاع **جميع الصفوف** بدلًا من صف واحد فقط
 
         cur.close()  # ✅ إغلاق الاتصال بعد الانتهاء
