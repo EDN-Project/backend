@@ -2,7 +2,22 @@ import app as a
 import access
 import sign_up
 import payment
+import iot_back
+import threading
+from iot import setup_mqtt_client
 
+# تهيئة IoT thread
+def start_iot_service():
+    try:
+        print("🚀 Starting IoT Service...")
+        client = setup_mqtt_client()
+        client.loop_forever()
+    except Exception as e:
+        print("❌ IoT Service Error:", e)
+
+# بدء تشغيل IoT thread
+iot_thread = threading.Thread(target=start_iot_service, daemon=True)
+iot_thread.start()
 
 @a.app.route("/top_importers", methods=["POST"])
 def top_importers():
@@ -421,9 +436,13 @@ def zo2_3am():
 
 
 
-@a.app.route("/tasmeed", methods=["GET"])
+@a.app.route("/tasmeed", methods=["POST"])
 def tasmeed():
     try:
+        
+        data = a.request.json  # 📥 استقبال البيانات كـ JSON
+        stage = data.get("stage")
+        
         cur = a.conn.cursor()
 
         # ✅ جلب أسماء الأعمدة
@@ -439,10 +458,11 @@ def tasmeed():
         # ✅ تكوين استعلام ديناميكي لاختيار البيانات من الأعمدة المحددة
         query_data = f"""
             SELECT {', '.join([f'"{col}"' for col in columns])}
-            FROM tasmeed.tasmeed
+            FROM tasmeed.tasmeed 
+            WHERE stage = %s
         """
         
-        cur.execute(query_data)
+        cur.execute(query_data , (stage,))
         data = cur.fetchall()  # ✅ استرجاع **جميع الصفوف** بدلًا من صف واحد فقط
 
         cur.close()  # ✅ إغلاق الاتصال بعد الانتهاء
