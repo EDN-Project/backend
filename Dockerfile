@@ -1,22 +1,28 @@
-FROM python:3.9.21-alpine3.21
+FROM python:3.13-alpine
 
-# تثبيت الأدوات المطلوبة وإضافة مستودع PostgreSQL الرسمي
-RUN apt-get update && apt-get install -y curl gnupg lsb-release
-RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
-RUN echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-RUN apt-get update && apt-get install -y postgresql-client-17
+# تحديث apk وتثبيت الأدوات المطلوبة مع postgresql-client و bash و tzdata
+RUN apk update && apk add --no-cache \
+    bash \
+    curl \
+    gnupg \
+    lsb-release \
+    postgresql-client \
+    tzdata
 
-# إنشاء مجلد للتطبيق
+# ضبط المنطقة الزمنية لمصر
+RUN cp /usr/share/zoneinfo/Africa/Cairo /etc/localtime && echo "Africa/Cairo" > /etc/timezone
+
+# تعيين مجلد العمل
 WORKDIR /app
 
-# نسخ كود التطبيق وقاعدة البيانات
+# نسخ ملفات التطبيق
 COPY . /app
 
-# جعل `entrypoint.sh` قابلاً للتنفيذ
+# إعطاء صلاحيات التنفيذ للـ entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# تثبيت المتطلبات
+# تثبيت مكتبات بايثون المطلوبة
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# تشغيل السكريبت عند بدء التشغيل
+# تشغيل السكريبت عند بداية الكونتينر
 ENTRYPOINT ["/bin/bash", "/app/entrypoint.sh"]
