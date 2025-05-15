@@ -8,3 +8,4 @@ requests
 bcrypt
 PyJWT==2.8.0
 pandas
+paho-mqtt==1.6.1
