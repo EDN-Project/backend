@@ -112,7 +112,7 @@ def get_daily_readings():
 
         query = """
             SELECT day, month, year, time, ph, temperature, humidity, salt, light, ec
-            FROM raeding
+            FROM sensor_readings.readings
             WHERE day = %s AND month = %s AND year = %s
             ORDER BY time;
         """
@@ -124,7 +124,7 @@ def get_daily_readings():
         detailed_readings = []
         for reading in readings:
             detailed_readings.append({
-                'time': reading[3].strftime('%H:%M:%S') if isinstance(reading[3], a.datetime) else reading[3],
+                'time': reading[3].hour if hasattr(reading[3], 'hour') else int(str(reading[3]).split(':')[0]),
                 'ph': reading[4],
                 'temperature': reading[5],
                 'humidity': reading[6],
@@ -200,7 +200,7 @@ def get_month_readings():
 
     query = """
         SELECT day, month, year, time, ph, temperature, humidity, salt, light, ec
-        FROM raeding
+        FROM sensor_readings.readings
         WHERE month = %s AND year = %s
         ORDER BY day, time;
     """
@@ -260,7 +260,7 @@ def get_readings_between_dates():
 
     query = """
         SELECT day, month, year, time, ph, temperature, humidity, salt, light, ec
-        FROM raeding
+        FROM sensor_readings.readings
         WHERE (year > %s OR (year = %s AND month > %s) OR (year = %s AND month = %s AND day >= %s))
           AND (year < %s OR (year = %s AND month < %s) OR (year = %s AND month = %s AND day <= %s))
         ORDER BY year, month, day, time;
@@ -487,7 +487,7 @@ def get_daily_actions():
         formatted_actions = []
         for action in actions:
             formatted_actions.append({
-                'time': action[0].strftime('%H:%M:%S') if isinstance(action[0], a.datetime) else action[0],
+                'time': action[0].hour if hasattr(action[0], 'hour') else int(str(action[0]).split(':')[0]),
                 'type': action[4]
             })
 
@@ -546,7 +546,7 @@ def get_monthly_actions():
             daily_actions[day] = []
         
         daily_actions[day].append({
-            'time': action[0].strftime('%H:%M:%S') if isinstance(action[0], a.datetime) else action[0],
+            'time': action[0].hour if hasattr(action[0], 'hour') else int(str(action[0]).split(':')[0]),
             'type': action[4]
         })
 
@@ -626,7 +626,7 @@ def get_actions_between_dates():
             daily_actions[day_key] = []
         
         daily_actions[day_key].append({
-            'time': action[0].strftime('%H:%M:%S') if isinstance(action[0], a.datetime) else action[0],
+            'time': action[0].hour if hasattr(action[0], 'hour') else int(str(action[0]).split(':')[0]),
             'type': action[4]
         })
 
@@ -681,7 +681,7 @@ def get_latest_readings():
                     'month': reading[1],
                     'year': reading[2]
                 },
-                'time': reading[3].strftime('%H:%M:%S') if isinstance(reading[3], a.datetime) else reading[3],
+                'time': reading[3].hour if hasattr(reading[3], 'hour') else int(str(reading[3]).split(':')[0]),
                 'readings': {
                     'ph': reading[4],
                     'temperature': reading[5],
