@@ -1,4 +1,4 @@
-Flask
+flask
 flask-session
 flask-cors
 flask-mail
@@ -9,3 +9,4 @@ bcrypt
 PyJWT==2.8.0
 pandas
 paho-mqtt==1.6.1
+Pillow
