@@ -3,6 +3,7 @@ import access
 import sign_up
 import payment
 import iot_back
+import ai
 import threading
 from iot import setup_mqtt_client
 
@@ -436,14 +437,61 @@ def zo2_3am():
 
 
 
-@a.app.route("/tasmeed", methods=["POST"])
+@a.app.route("/tasmeed", methods=["GET"])
+
+def determine_plant_stage(days_passed):
+    raw_stages = [
+        ("Seed Germination and Early Seedling", 7, 17),
+        ("Vegetative Growth", 30, 50),
+        ("Flowering", 20, 30),
+        ("Fruiting", 30, 45),
+        ("Harvesting", 10, 20),
+        ("Post-Harvest", 10, 20),
+    ]
+
+    stages_timeline = []
+    start_min = 0
+    start_max = 0
+
+    for name, min_duration, max_duration in raw_stages:
+        end_min = start_min + min_duration
+        end_max = start_max + max_duration
+        stages_timeline.append((name, start_min, end_min, start_max, end_max))
+        start_min = end_min
+        start_max = end_max
+
+    for name, min_start, min_end, max_start, max_end in stages_timeline:
+        if min_start <= days_passed <= min_end or max_start <= days_passed <= max_end:
+            return name
+
+    return None
+
+
 def tasmeed():
     try:
-        
-        data = a.request.json  # 📥 استقبال البيانات كـ JSON
-        stage = data.get("stage")
-        
         cur = a.conn.cursor()
+
+        # ✅ الحصول على جميع التواريخ من قاعدة البيانات
+        cur.execute("SELECT DISTINCT day, month, year FROM sensor_readings.readings")
+        dates = cur.fetchall()
+
+        unique_dates = set()
+        for day, month, year in dates:
+            try:
+                dt = a.datetime(year, month, day)
+                unique_dates.add(dt)
+            except:
+                continue
+
+        days_passed = len(unique_dates)
+        print(f"📅 Days passed: {days_passed}")
+
+        # ✅ تحديد المرحلة الحالية بناءً على عدد الأيام
+        current_stage = determine_plant_stage(days_passed)
+        print(f"🌱 Current Stage: {current_stage}")
+
+        if not current_stage:
+            return a.jsonify({"error": "Could not determine current stage"}), 404
 
         # ✅ جلب أسماء الأعمدة
         query_columns = """
@@ -455,33 +503,38 @@ def tasmeed():
         cur.execute(query_columns, ('tasmeed',))
         columns = [col[0] for col in cur.fetchall()]
 
-        # ✅ تكوين استعلام ديناميكي لاختيار البيانات من الأعمدة المحددة
+        # ✅ جلب البيانات الخاصة بالمرحلة الحالية
         query_data = f"""
             SELECT {', '.join([f'"{col}"' for col in columns])}
             FROM tasmeed.tasmeed 
             WHERE stage = %s
         """
-        
-        cur.execute(query_data , (stage,))
-        data = cur.fetchall()  # ✅ استرجاع **جميع الصفوف** بدلًا من صف واحد فقط
+        cur.execute(query_data, (current_stage,))
+        data = cur.fetchall()
 
         cur.close()  # ✅ إغلاق الاتصال بعد الانتهاء
 
         if data:
-            # تحويل كل صف إلى قاموس
+            # ✅ نفس الشكل القديم للبيانات مع إضافة المفتاح الجديد "stage"
             result = [dict(zip(columns, row)) for row in data]
-            return a.jsonify(result)
+            return a.jsonify({
+                "stage": current_stage,
+                "data": result
+            })
         else:
-            return a.jsonify({"error": "No data found"}), 404
+            return a.jsonify({
+                "stage": current_stage,
+                "data": []
+            }), 404
 
     except Exception as e:
-        print("❌ Error in /tasmeed:", str(e))  # طباعة الخطأ في التيرمينال
+        print("❌ Error in /tasmeed:", str(e))
         return a.jsonify({"error": str(e)}), 500
     
     
 
 
-@a.app.route('/recommend_tasmeed', methods=['GET'])
+@a.app.route('/recommend_tasmeed', methods=['POST'])
 def recommend():
     
     recommendations = {

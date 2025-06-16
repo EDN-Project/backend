@@ -654,7 +654,7 @@ def get_actions_between_dates():
     return a.jsonify(response)
 
 @a.app.route('/readings/latest', methods=['GET'])
-def get_latest_readings():
+def get_latest_readings1():
     try:
         cur = a.conn.cursor()
 
@@ -702,3 +702,24 @@ def get_latest_readings():
             'status': 'error',
             'message': str(e)
         }), 500
+        
+        
+
+@a.app.route('/readings/latest/water', methods=['GET'])
+def get_latest_readings():
+    try:
+        cur = a.conn.cursor()
+        
+        cur.execute("SELECT water FROM sensor_readings.readings ORDER BY id DESC LIMIT 1;")
+        result = cur.fetchone()
+
+        cur.close()
+        a.conn.close()
+
+        if result:
+            return a.jsonify({'water': result[0]})
+        else:
+            return a.jsonify({'message': 'No data found'}), 404
+
+    except Exception as e:
+        return a.jsonify({'error': str(e)}), 500        

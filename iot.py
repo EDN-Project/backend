@@ -24,7 +24,7 @@ def log_action_to_db(cursor, action_type):
     try:
         now = datetime.now()
         day, month, year = now.day, now.month, now.year
-        current_time = str(now.hour)  # تخزين رقم الساعة فقط
+        current_time = now.strftime("%H:%M:%S")  # تخزين رقم الساعة فقط
 
         query = """
         INSERT INTO sensor_readings.actions (action_day, action_month, action_year, action_time, action_type)
@@ -137,9 +137,10 @@ def on_message(client, userdata, msg):
         humidity = payload.get("humidity")
         light = payload.get("light")
         salt = payload.get("salt")
+        water = payload.get("water")
         now = datetime.now()
         day, month, year = now.day, now.month, now.year
-        current_time = str(now.hour)  # تخزين رقم الساعة فقط
+        current_time = now.strftime("%H:%M:%S")  # تخزين رقم الساعة فقط
 
         try:
             # Start a transaction
@@ -195,10 +196,10 @@ def on_message(client, userdata, msg):
 
             # Insert sensor readings with ph and ec
             query = """
-            INSERT INTO sensor_readings.readings (temperature, humidity, light, salt, ph, ec, day, month, year, time)
+            INSERT INTO sensor_readings.readings (temperature, humidity, light, salt, ph, ec, day, month, year, time , water)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(query, (temperature, humidity, light, salt, ph, ec, day, month, year, current_time))
+            cursor.execute(query, (temperature, humidity, light, salt, ph, ec, day, month, year, current_time , water))
 
             alerts = []  # Store alerts to be logged
 
@@ -258,6 +259,15 @@ def on_message(client, userdata, msg):
                     client.publish("esp32/humidity", "4", qos=1)
                     print(msg)
                     alerts.append(msg)
+                    
+                    
+            
+            if water is not None:
+                if water == "low":
+                    msg = "🚰 Water level LOW!"
+                    client.publish("esp32/water", "5", qos=1)
+                    print(msg)
+                    alerts.append(msg)
 
             # Log all alerts in the same transaction
             for alert in alerts:
@@ -265,7 +275,7 @@ def on_message(client, userdata, msg):
 
             # Commit everything at once
             conn.commit()
-            print(f"✅ Data Inserted: Temp={temperature}, Humidity={humidity}, Light={light}, Salt={salt}, pH={ph}, EC={ec}")
+            print(f"✅ Data Inserted: Temp={temperature}, Humidity={humidity}, Light={light}, Salt={salt}, pH={ph}, EC={ec} , Water={water}")
             
         except Exception as e:
             # If there's an error, rollback the transaction
