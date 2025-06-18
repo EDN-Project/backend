@@ -6,6 +6,7 @@ from authlib.integrations.flask_client import OAuth
 import psycopg2
 import random
 import smtplib
+import calendar
 import bcrypt
 import jwt
 import secrets
@@ -14,8 +15,10 @@ from datetime import datetime, timedelta
 import threading
 import pandas as pd
 import os
-
-
+import time
+from PIL import Image
+import io
+import requests
 
 
 # -----------------------------------------all things about the app-------------------------------------------------
@@ -115,5 +118,5 @@ def send_email(email, code):
 
 
 # بيانات الاتصال بقاعدة البيانات
-connection_string = "dbname=eden user=postgres password=ahmed2003 host= db port=5432"
+connection_string = "dbname=eden user=postgres password=ahmed2003 host=db port=5432"
 conn = psycopg2.connect(connection_string)

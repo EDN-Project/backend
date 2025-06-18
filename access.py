@@ -1,7 +1,7 @@
 import app as a
 
 
-@a.app.route("/add_privilage_user", methods=["GET"])
+@a.app.route("/add_privilage_user", methods=["POST"])
 
 def add_privilage_user():
     
@@ -15,7 +15,6 @@ def add_privilage_user():
         data_sensor_access =data.get('data_sensor_acccess')
         daily_report = data.get('daily_report')
         ai_report = data.get('ai_report')
-        user_type = data.get('user_type')
         
         
         token = a.request.headers.get('Authorization')
@@ -39,11 +38,10 @@ def add_privilage_user():
                data_sensor_access = %s,
                daily_report = %s,
                ai_report = %s,
-               user_type = %s,
                company_id = %s
            WHERE email = %s;"""
 
-           cur.execute(query, (give_access, global_access, data_sensor_access, daily_report, ai_report, user_type, company_id , email))
+           cur.execute(query, (give_access, global_access, data_sensor_access, daily_report, ai_report,company_id , email))
            a.conn.commit()
            cur.close()  
 

@@ -15,15 +15,13 @@ services:
       - "5432:5432"
 
   app:
-    image: ahmedwaleed95/my-code-app:latest
+    image: ahmedwaleed95/code-app:latest     # ✅ تطبيقك من Docker Hub
     depends_on:
       - db
     environment:
       PGPASSWORD: ahmed2003
     ports:
       - "5000:5000"
-    volumes:
-      - .:/app
     restart: always
 
 volumes:
