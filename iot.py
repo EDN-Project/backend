@@ -24,7 +24,7 @@ def log_action_to_db(cursor, action_type):
     try:
         now = datetime.now()
         day, month, year = now.day, now.month, now.year
-        current_time = now.strftime("%H:%M:%S")  # تخزين رقم الساعة فقط
+        current_time = now.strftime("%H:%M:%S")
 
         query = """
         INSERT INTO sensor_readings.actions (action_day, action_month, action_year, action_time, action_type)
@@ -38,7 +38,6 @@ def log_action_to_db(cursor, action_type):
         raise
 
 
-# Get current stage and min/max values
 def get_current_stage_and_ranges(cursor):
     try:
         cursor.execute("SELECT DISTINCT day, month, year FROM sensor_readings.readings")
@@ -116,10 +115,9 @@ def get_current_stage_and_ranges(cursor):
         print("❌ Error:", e)
         return None, None
 
-# Message receiving function
+
 def on_message(client, userdata, msg):
     try:
-        # تجاهل الرسائل القديمة (retained)
         if msg.retain:
             print("🛑 Ignored retained message")
             return
@@ -138,176 +136,100 @@ def on_message(client, userdata, msg):
         light = payload.get("light")
         salt = payload.get("salt")
         water = payload.get("water")
+
         now = datetime.now()
         day, month, year = now.day, now.month, now.year
-        current_time = now.strftime("%H:%M:%S")  # تخزين رقم الساعة فقط
+        current_time = now.strftime("%H:%M:%S")
 
-        try:
-            # Start a transaction
-            conn.autocommit = False
-            
-            # Lock the tables to prevent concurrent inserts
-            cursor.execute("LOCK TABLE sensor_readings.readings IN EXCLUSIVE MODE")
-            
-            # Check if reading already exists for this timestamp
+        conn.autocommit = False
+        cursor.execute("LOCK TABLE sensor_readings.readings IN EXCLUSIVE MODE")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM sensor_readings.readings 
+            WHERE day = %s AND month = %s AND year = %s AND time = %s
+        """, (day, month, year, current_time))
+
+        if cursor.fetchone()[0] > 0:
+            print("⚠️ Reading already exists for this timestamp, skipping...")
+            conn.rollback()
+            return
+
+        current_stage, thresholds = get_current_stage_and_ranges(cursor)
+
+        ph = 6.0
+        ec = 1.5
+
+        if current_stage:
             cursor.execute("""
-                SELECT COUNT(*) FROM sensor_readings.readings 
-                WHERE day = %s AND month = %s AND year = %s AND time = %s
-            """, (day, month, year, current_time))
-            
-            if cursor.fetchone()[0] > 0:
-                print("⚠️ Reading already exists for this timestamp, skipping...")
-                conn.rollback()
-                return
-            
-            # Get current stage and thresholds once
-            current_stage, thresholds = get_current_stage_and_ranges(cursor)
-            
-            # Set default pH and EC values
-            ph = 6.0  # Default values
-            ec = 1.5
+                SELECT ph_min, ph_max, ec_min, ec_max
+                FROM tasmeed.tasmeed_iot
+                WHERE stage = %s
+                LIMIT 1
+            """, (current_stage,))
+            ranges = cursor.fetchone()
+            if ranges:
+                ph_min, ph_max = ranges[0], ranges[1]
+                ec_min, ec_max = ranges[2], ranges[3]
 
-            if current_stage:
-                # Get optimal ph and ec values based on current stage
-                cursor.execute("""
-                    SELECT ph_min, ph_max, ec_min, ec_max
-                    FROM tasmeed.tasmeed_iot
-                    WHERE stage = %s
-                    LIMIT 1
-                """, (current_stage,))
-                ranges = cursor.fetchone()
-                if ranges:
-                    # Calculate random optimal values within the allowed range
-                    ph_min, ph_max = ranges[0], ranges[1]
-                    ec_min, ec_max = ranges[2], ranges[3]
-                    
-                    # Generate random values within 20% of the middle range
-                    ph_mid = (ph_max + ph_min) / 2
-                    ph_range = (ph_max - ph_min) * 0.2  # 20% of total range
-                    ph = round(random.uniform(ph_mid - ph_range, ph_mid + ph_range), 2)
-                    
-                    ec_mid = (ec_max + ec_min) / 2
-                    ec_range = (ec_max - ec_min) * 0.2  # 20% of total range
-                    ec = round(random.uniform(ec_mid - ec_range, ec_mid + ec_range), 2)
-                    
-                    # Ensure values stay within min-max bounds
-                    ph = max(ph_min, min(ph_max, ph))
-                    ec = max(ec_min, min(ec_max, ec))
+                ph = round(random.uniform((ph_max + ph_min) / 2 - (ph_max - ph_min) * 0.2, (ph_max + ph_min) / 2 + (ph_max - ph_min) * 0.2), 2)
+                ec = round(random.uniform((ec_max + ec_min) / 2 - (ec_max - ec_min) * 0.2, (ec_max + ec_min) / 2 + (ec_max - ec_min) * 0.2), 2)
+                ph = max(ph_min, min(ph_max, ph))
+                ec = max(ec_min, min(ec_max, ec))
 
-            # Insert sensor readings with ph and ec
-            query = """
-            INSERT INTO sensor_readings.readings (temperature, humidity, light, salt, ph, ec, day, month, year, time , water)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            cursor.execute(query, (temperature, humidity, light, salt, ph, ec, day, month, year, current_time , water))
+        query = """
+        INSERT INTO sensor_readings.readings (temperature, humidity, light, salt, ph, ec, day, month, year, time, water)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (temperature, humidity, light, salt, ph, ec, day, month, year, current_time, water))
 
-            alerts = []  # Store alerts to be logged
+        alerts = []
 
+        if thresholds:
             if temperature is not None:
                 if temperature < thresholds['temp_min']:
-                    diff = round(thresholds['temp_min'] - temperature, 2)
-                    msg = f"⬇️ Temperature LOW: {temperature}°C (−{diff}°C below min {thresholds['temp_min']})"
                     client.publish("esp32/alert", "1", qos=1)
-                    print(msg)
-                    alerts.append(msg)
-
                 elif temperature > thresholds['temp_max']:
-                    diff = round(temperature - thresholds['temp_max'], 2)
-                    msg = f"⬆️ Temperature HIGH: {temperature}°C (+{diff}°C above max {thresholds['temp_max']})"
                     client.publish("esp32/alert", "1", qos=1)
-                    print(msg)
-                    alerts.append(msg)
 
             if light is not None:
-                if light < thresholds['light_min']:
-                    diff = round(thresholds['light_min'] - light, 2)
-                    msg = f"⬇️ Light LOW: {light} lux (−{diff} below min {thresholds['light_min']})"
+                if light < thresholds['light_min'] or light > thresholds['light_max']:
                     client.publish("esp32/light", "2", qos=1)
-                    print(msg)
-                    alerts.append(msg)
-                elif light > thresholds['light_max']:
-                    diff = round(light - thresholds['light_max'], 2)
-                    msg = f"⬆️ Light HIGH: {light} lux (+{diff} above max {thresholds['light_max']})"
-                    client.publish("esp32/light", "2", qos=1)
-                    print(msg)
-                    alerts.append(msg)
 
             if salt is not None:
-                if salt < thresholds['salt_min']:
-                    diff = round(thresholds['salt_min'] - salt, 2)
-                    msg = f"⬇️ Salinity LOW: {salt} (−{diff} below min {thresholds['salt_min']})"
+                if salt < thresholds['salt_min'] or salt > thresholds['salt_max']:
                     client.publish("esp32/salt", "3", qos=1)
-                    print(msg)
-                    alerts.append(msg)
-                elif salt > thresholds['salt_max']:
-                    diff = round(salt - thresholds['salt_max'], 2)
-                    msg = f"⬆️ Salinity HIGH: {salt} (+{diff} above max {thresholds['salt_max']})"
-                    client.publish("esp32/salt", "3", qos=1)
-                    print(msg)
-                    alerts.append(msg)
 
             if humidity is not None:
-                if humidity < thresholds['humidity_min']:
-                    diff = round(thresholds['humidity_min'] - humidity, 2)
-                    msg = f"⬇️ Humidity LOW: {humidity}% (−{diff}% below min {thresholds['humidity_min']})"
+                if humidity < thresholds['humidity_min'] or humidity > thresholds['humidity_max']:
                     client.publish("esp32/humidity", "4", qos=1)
-                    print(msg)
-                    alerts.append(msg)
-                elif humidity > thresholds['humidity_max']:
-                    diff = round(humidity - thresholds['humidity_max'], 2)
-                    msg = f"⬆️ Humidity HIGH: {humidity}% (+{diff}% above max {thresholds['humidity_max']})"
-                    client.publish("esp32/humidity", "4", qos=1)
-                    print(msg)
-                    alerts.append(msg)
-                    
-                    
-            
-            if water is not None:
-                if water == "low":
-                    msg = "🚰 Water level LOW!"
-                    client.publish("esp32/water", "5", qos=1)
-                    print(msg)
-                    alerts.append(msg)
 
-            # Log all alerts in the same transaction
-            for alert in alerts:
-                log_action_to_db(cursor, alert)
+            if water is not None and water == "low":
+                client.publish("esp32/water", "5", qos=1)
 
-            # Commit everything at once
-            conn.commit()
-            print(f"✅ Data Inserted: Temp={temperature}, Humidity={humidity}, Light={light}, Salt={salt}, pH={ph}, EC={ec} , Water={water}")
-            
-        except Exception as e:
-            # If there's an error, rollback the transaction
-            conn.rollback()
-            print("❌ Error in database transaction:", e)
-            return
-        finally:
-            # Reset autocommit
-            conn.autocommit = True
+        conn.commit()
+        conn.autocommit = True
 
     except Exception as e:
+        conn.rollback()
+        conn.autocommit = True
         print("❌ Error processing message:", e)
 
-# On disconnection
+
 def on_disconnect(client, userdata, rc):
     print("⚠️ Disconnected from MQTT! Trying to reconnect...")
     while not client.is_connected():
         try:
             client.reconnect()
-            print("✅ Reconnected!")
             break
         except Exception as e:
             print("❌ Reconnect failed:", e)
         time.sleep(5)
 
-# On broker connection
+
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        print("✅ Connected to MQTT Broker!")
         client.subscribe("esp32/eden", qos=2)
-    else:
-        print(f"❌ Connection failed with code {rc}")
+
 
 def setup_mqtt_client():
     client = mqtt.Client()
@@ -317,13 +239,11 @@ def setup_mqtt_client():
 
     try:
         client.connect("broker.hivemq.com", 1883, 60)
-        print("✅ Successfully connected to HiveMQ MQTT Broker!")
     except Exception as e:
         print("❌ Failed to connect to MQTT Broker:", e)
-    
+
     return client
 
 if __name__ == "__main__":
-    # This code will only run when the file is executed directly
     client = setup_mqtt_client()
     client.loop_forever()
